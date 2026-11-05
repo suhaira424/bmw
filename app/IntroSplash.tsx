@@ -5,9 +5,9 @@ import { useEffect, useState } from "react";
 type Stage = "text" | "lights" | "leaving" | "done";
 
 interface IntroSplashProps {
-  /** Apni awaz ka path, e.g. "/sounds/intro.mp3" */
+  /** Apni awaz ka path, e.g. "/ReelAudio-1896.mp3" */
   soundSrc?: string;
-  /** Awaz file ke kitne second se shuru ho (shuru ka hissa skip hoga) */
+  /** Awaz file ke kitne second se shuru ho */
   soundStart?: number;
   /** Awaz file ke kitne second par ruk jaye (optional) */
   soundEnd?: number;
@@ -113,12 +113,12 @@ function Lamp({ x, mirror, on }: { x: number; mirror?: boolean; on: boolean }) {
 
 export default function IntroSplash({
   soundSrc,
-  soundStart = 5,
+  soundStart = 0,
   soundEnd,
   textDuration = 3000,
-  lightsDuration = 500,
-  firstLightDelay = 100,
-  secondLightDelay = 300,
+  lightsDuration = 3000,
+  firstLightDelay = 500,
+  secondLightDelay = 1400,
   firstSide = "right",
   lightSfx = false,
   lightSoundSrc,
@@ -133,36 +133,43 @@ export default function IntroSplash({
   useEffect(() => {
     let cancelled = false;
     let started = false;
+    let ctx: AudioContext | null = null;
+    let main: HTMLAudioElement | null = null;
     const timers: number[] = [];
     const audios: HTMLAudioElement[] = [];
     const events = ["pointerdown", "keydown", "touchstart"] as const;
 
-    const AC: typeof AudioContext | undefined =
-      window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = AC ? new AC() : null;
-
     const add = (fn: () => void, ms: number) =>
       timers.push(window.setTimeout(fn, ms));
 
-    // Main awaz: soundStart second se shuru
-    const playMain = (src: string) => {
+    /* ---------- Awaz ---------- */
+    const prepareMain = (src: string) => {
       const a = new Audio(src);
       a.preload = "auto";
       audios.push(a);
-      const go = () => {
-        try {
-          a.currentTime = soundStart;
-        } catch {
-          /* ignore */
-        }
-        a.play().catch(() => {});
-      };
-      if (a.readyState >= 1) go();
-      else a.addEventListener("loadedmetadata", go, { once: true });
+      a.addEventListener("error", () =>
+        console.error("Awaz ki file nahi mili:", src)
+      );
+      return a;
+    };
 
-      if (soundEnd && soundEnd > soundStart) {
-        add(() => a.pause(), (soundEnd - soundStart) * 1000);
-      }
+    // soundStart second se shuru karke chalata hai
+    const startMain = (a: HTMLAudioElement) => {
+      const seek = () => {
+        if (isFinite(a.duration) && soundStart >= a.duration) {
+          console.warn("soundStart file ki length se zyada hai, 0 se chala rahe hain");
+          a.currentTime = 0;
+        } else {
+          try {
+            a.currentTime = soundStart;
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+      if (a.readyState >= 1) seek();
+      else a.addEventListener("loadedmetadata", seek, { once: true });
+      return a.play();
     };
 
     const playShort = (src: string) => {
@@ -171,10 +178,17 @@ export default function IntroSplash({
       a.play().catch(() => {});
     };
 
-    const lightOn = (setter: (v: boolean) => void) => {
-      setter(true);
-      if (lightSoundSrc) playShort(lightSoundSrc);
-      else if (lightSfx && ctx && ctx.state === "running") playLightOnSfx(ctx);
+    const lightClick = () => {
+      if (!ctx) {
+        const AC: typeof AudioContext | undefined =
+          window.AudioContext || (window as any).webkitAudioContext;
+        if (AC) ctx = new AC();
+      }
+      const c = ctx;
+      if (!c) return;
+      const run = () => playLightOnSfx(c);
+      if (c.state === "running") run();
+      else c.resume().then(run).catch(() => {});
     };
 
     const speakFallback = () => {
@@ -201,22 +215,32 @@ export default function IntroSplash({
       }
     };
 
-    const runTimeline = () => {
+    /* ---------- Timeline: text → lights → fade out ---------- */
+    const lightOn = (setter: (v: boolean) => void) => {
+      setter(true);
+      if (lightSoundSrc) playShort(lightSoundSrc);
+      else if (lightSfx) lightClick();
+    };
+
+    const begin = () => {
+      if (started || cancelled) return;
+      started = true;
+      setNeedTap(false);
+
       const first = firstSide === "right" ? setRightOn : setLeftOn;
       const second = firstSide === "right" ? setLeftOn : setRightOn;
 
-      // 1) Text + awaz ek sath shuru
-      if (soundSrc) playMain(soundSrc);
-      else speakFallback();
+      if (main && soundEnd && soundEnd > soundStart) {
+        const m = main;
+        add(() => m.pause(), (soundEnd - soundStart) * 1000);
+      }
 
-      // 2) Text ke baad lights
       add(() => {
         setStage("lights");
         add(() => lightOn(first), firstLightDelay);
         add(() => lightOn(second), secondLightDelay);
       }, textDuration);
 
-      // 3) Lights ke baad fade out aur home page
       add(() => setStage("leaving"), textDuration + lightsDuration);
       add(() => {
         setStage("done");
@@ -224,40 +248,48 @@ export default function IntroSplash({
       }, textDuration + lightsDuration + 1000);
     };
 
-    const begin = () => {
-      if (started || cancelled) return;
-      started = true;
-      setNeedTap(false);
-      runTimeline();
-    };
-
-    const onGesture = () => {
-      events.forEach((e) => window.removeEventListener(e, onGesture));
-      if (ctx) ctx.resume().catch(() => {});
-      begin();
+    /* ---------- Shuru: pehle awaz chalane ki koshish ---------- */
+    const waitForGesture = (run: () => void) => {
+      const handler = () => {
+        events.forEach((e) => window.removeEventListener(e, handler));
+        run();
+      };
+      events.forEach((e) => window.addEventListener(e, handler, { once: true }));
     };
 
     const init = async () => {
-      if (ctx) {
-        try {
-          await Promise.race([
-            ctx.resume(),
-            new Promise((r) => window.setTimeout(r, 150)),
-          ]);
-        } catch {
-          /* ignore */
-        }
+      if (!soundSrc) {
+        begin();
+        speakFallback();
+        return;
       }
-      if (cancelled) return;
 
-      if (!ctx || ctx.state === "running") {
+      const a = prepareMain(soundSrc);
+      main = a;
+
+      try {
+        await startMain(a); // browser ne allow kiya
+        if (cancelled) return;
         begin();
-      } else if (tapIfBlocked) {
-        setNeedTap(true);
-        events.forEach((e) => window.addEventListener(e, onGesture, { once: true }));
-      } else {
-        events.forEach((e) => window.addEventListener(e, onGesture, { once: true }));
-        begin();
+      } catch (err) {
+        if (cancelled) return;
+        const blocked = (err as DOMException)?.name === "NotAllowedError";
+        if (!blocked) console.error("Awaz nahi chal saki:", err);
+
+        if (blocked && tapIfBlocked) {
+          // Tap ka intezar, tap par awaz aur intro ek sath
+          setNeedTap(true);
+          waitForGesture(() => {
+            startMain(a).catch(() => {});
+            begin();
+          });
+        } else {
+          // Bina ruke chalao, awaz pehle tap par shuru hogi
+          begin();
+          waitForGesture(() => {
+            startMain(a).catch(() => {});
+          });
+        }
       }
     };
     init();
@@ -265,7 +297,6 @@ export default function IntroSplash({
     return () => {
       cancelled = true;
       timers.forEach(window.clearTimeout);
-      events.forEach((e) => window.removeEventListener(e, onGesture));
       audios.forEach((a) => a.pause());
       ctx?.close().catch(() => {});
       if ("speechSynthesis" in window) {
@@ -296,7 +327,6 @@ export default function IntroSplash({
         transition: "opacity 1s ease",
       }}
     >
-      {/* Tap to start (sirf jab browser awaz block kare) */}
       {needTap && (
         <p
           style={{
@@ -312,7 +342,6 @@ export default function IntroSplash({
         </p>
       )}
 
-      {/* 1) Text */}
       {stage === "text" && !needTap && (
         <h1
           style={{
@@ -331,7 +360,6 @@ export default function IntroSplash({
         </h1>
       )}
 
-      {/* 2) Headlights (text ke baad) */}
       {showLights && (
         <svg
           viewBox="0 0 600 250"
