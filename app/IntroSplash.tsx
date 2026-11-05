@@ -147,9 +147,9 @@ export default function IntroSplash({
       const a = new Audio(src);
       a.preload = "auto";
       audios.push(a);
-      a.addEventListener("error", () =>
-        console.error("Awaz ki file nahi mili:", src)
-      );
+    a.addEventListener("error", () => {
+  const e = a.error;
+  console.error("Audio error:", src, "code:", e?.code, "msg:", e?.message);
       return a;
     };
 
