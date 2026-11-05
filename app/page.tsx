@@ -28,7 +28,7 @@ export default function Home() {
       <About />
       <Experience />
      <IntroSplash
-  soundSrc="/Reelaudio-1896.mp3"
+  soundSrc="/public/ReelAudio-1896.mp3"
   soundStart={6}
   soundEnd={9.4}
   textDuration={2800}
