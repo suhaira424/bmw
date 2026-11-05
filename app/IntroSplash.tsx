@@ -144,11 +144,21 @@ export default function IntroSplash({
     const add = (fn: () => void, ms: number) =>
       timers.push(window.setTimeout(fn, ms));
 
+    // Audio banata hai aur error log karta hai
+    const makeAudio = (src: string) => {
+      const a = new Audio(src);
+      a.onerror = () => {
+        const e = a.error;
+        console.error("Audio error:", src, "code:", e?.code, "msg:", e?.message);
+      };
+      audios.push(a);
+      return a;
+    };
+
     // Main awaz: soundStart second se shuru
     const playMain = (src: string) => {
-      const a = new Audio(src);
+      const a = makeAudio(src);
       a.preload = "auto";
-      audios.push(a);
       const go = () => {
         try {
           a.currentTime = soundStart;
@@ -166,8 +176,7 @@ export default function IntroSplash({
     };
 
     const playShort = (src: string) => {
-      const a = new Audio(src);
-      audios.push(a);
+      const a = makeAudio(src);
       a.play().catch(() => {});
     };
 
@@ -264,7 +273,7 @@ export default function IntroSplash({
 
     return () => {
       cancelled = true;
-      timers.forEach(window.clearTimeout);
+      timers.forEach((id) => window.clearTimeout(id));
       events.forEach((e) => window.removeEventListener(e, onGesture));
       audios.forEach((a) => a.pause());
       ctx?.close().catch(() => {});
