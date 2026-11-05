@@ -27,14 +27,13 @@ export default function Home() {
       <AboutCar />
       <About />
       <Experience />
-   <IntroSplash 
-  soundSrc="/ReelAudio-1896.mp3"
-  soundStart={6}
-  soundEnd={9.4}
-  textDuration={2800}
-  lightsDuration={1300}
-/>
-
+      <IntroSplash
+        soundSrc="/ReelAudio-1896.mp3"
+        soundStart={6}
+        soundEnd={9.4}
+        textDuration={2800}
+        lightsDuration={1300}
+      />
 
       {/* CLASSICAL LUXURY FOOTER INTEGRATION */}
       <footer className="bg-[#050505] text-white border-t border-white/5 pt-16 pb-12 px-8 md:px-16 relative">
