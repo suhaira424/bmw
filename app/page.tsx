@@ -30,7 +30,7 @@ export default function Home() {
      <IntroSplash
   soundSrc="/Reelaudio-1896.mp3"
   soundStart={6}
-  soundEnd={9.4}
+  soundEnd={11}
   textDuration={2800}
   lightsDuration={1300}
     
