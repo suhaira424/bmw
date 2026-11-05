@@ -6,7 +6,7 @@ import Doors from "./components/Doors";
 import Showroom from "./components/Showroom";
 import AboutCar from "./components/AboutCar";
 import About from "./About";
-import IntroSplash from "./components/IntroSplash";
+import IntroSplash from "./IntroSplash";
 import Experience from "./components/experience";
 import { ArrowUp } from "lucide-react";
 import { FaInstagram, FaXTwitter, FaFacebookF } from "react-icons/fa6";
@@ -28,7 +28,7 @@ export default function Home() {
       <About />
       <Experience />
      <IntroSplash
-  soundSrc="/public/ReelAudio-1896.mp3"
+  soundSrc="/ReelAudio-1896.mp3"
   soundStart={6}
   soundEnd={9.4}
   textDuration={2800}
